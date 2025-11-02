@@ -26,6 +26,13 @@ async createRoom(clientId: number, psychicId: number, io: Server): Promise<Room>
   if (!client || !psychic) {
     throw new Error("Client or psychic not found");
   }
+if (Number(client.balance) <= 0) {
+    console.log('no balance');
+    // throw new Error("No balance");
+    
+  }
+  console.log({client});
+  
 
   // Check if a room already exists between these two users
   const existingRoom = await this.roomRepository.findOne({

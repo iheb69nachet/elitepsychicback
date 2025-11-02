@@ -39,6 +39,8 @@ export class ChatService {
       console.log("a user connected123");
 
       socket.on("join", ({ userId }) => {
+      console.log({userId});
+
         socket.join(userId);
         (socket as any).userId = userId;
         this.userService.setUserOnlineStatus(userId, true);

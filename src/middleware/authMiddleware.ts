@@ -4,7 +4,7 @@ import jwt, { TokenExpiredError } from 'jsonwebtoken';
 import { AuthService } from '../services/AuthService';
 
 export interface AuthRequest extends Request {
-  user?: { id: number; email: string };
+  user?: { id: number; email: string; role: string };
 }
 
 const authService = new AuthService();
@@ -18,7 +18,7 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
 
   try {
     const decoded = jwt.verify(token, 'your_jwt_secret');
-    req.user = decoded as { id: number; email: string };
+    req.user = decoded as { id: number; email: string; role: string };
     next();
   } catch (ex) {
     if (ex instanceof TokenExpiredError) {
@@ -32,7 +32,7 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
         res.setHeader('Authorization', `Bearer ${newTokens.accessToken}`);
         try {
           const decoded = jwt.verify(newTokens.accessToken, 'your_jwt_secret');
-          req.user = decoded as { id: number; email: string };
+          req.user = decoded as { id: number; email: string; role: string };
           next();
         } catch (error) {
           return res.status(400).send('Invalid token after refresh.');

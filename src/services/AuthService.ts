@@ -44,7 +44,7 @@ export class AuthService {
   }
 
   async login(email: string, password: string): Promise<{ accessToken: string, refreshToken: string, user: User } | null> {
-    const user = await userRepository.findOne({ where: { email } });
+    const user = await userRepository.findOne({ where: { email }, relations: ["role"] });
     if (!user) {
       return null;
     }
@@ -54,7 +54,7 @@ export class AuthService {
       return null;
     }
 
-    const accessToken = jwt.sign({ id: user.id, email: user.email }, "your_jwt_secret", {
+    const accessToken = jwt.sign({ id: user.id, email: user.email, role: user.role.name }, "your_jwt_secret", {
       expiresIn: "1m", // Short-lived access token
     });
 
@@ -68,13 +68,13 @@ export class AuthService {
   }
 
   async refreshAccessToken(refreshToken: string): Promise<{ accessToken: string } | null> {
-    const user = await userRepository.findOne({ where: { refreshToken } });
+    const user = await userRepository.findOne({ where: { refreshToken }, relations: ["role"] });
 
     if (!user || !user.refreshTokenExpires || user.refreshTokenExpires < new Date()) {
       return null;
     }
 
-    const accessToken = jwt.sign({ id: user.id, email: user.email }, "your_jwt_secret", {
+    const accessToken = jwt.sign({ id: user.id, email: user.email, role: user.role.name }, "your_jwt_secret", {
       expiresIn: "15m",
     });
 

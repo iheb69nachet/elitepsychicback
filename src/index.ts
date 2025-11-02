@@ -72,6 +72,8 @@ app.use('/api', stripeRoutes);
 app.use('/api', psychicSettingRoutes);
 app.use('/api', blogRoutes);
 app.use('/api', createRoomRoutes(io));
+import remedyAndSpellRoutes from './routes/remedyAndSpellRoutes';
+app.use('/api', remedyAndSpellRoutes);
 
 
 
