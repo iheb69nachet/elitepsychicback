@@ -2,8 +2,10 @@
 import { Request, Response } from "express";
 import { RoomService } from "../services/RoomService";
 
+import { Server } from "socket.io";
+
 export class RoomController {
-  constructor(private roomService: RoomService) {}
+  constructor(private roomService: RoomService, private io: Server) {}
 
   async createRoom(req: Request, res: Response): Promise<void> {
     const { clientId, psychicId } = req.body;
@@ -14,7 +16,7 @@ export class RoomController {
     }
 
     try {
-      const room = await this.roomService.createRoom(clientId, psychicId);
+      const room = await this.roomService.createRoom(clientId, psychicId, this.io);
       res.status(201).json(room);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

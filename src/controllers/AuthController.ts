@@ -21,10 +21,32 @@ export class AuthController {
     const { email, password } = req.body;
     const result = await authService.login(email, password);
     if (result) {
-      res.json(result);
+      const { accessToken, refreshToken, user } = result;
+      res.cookie('refreshToken', refreshToken, { httpOnly: true, sameSite: 'strict' });
+      res.json({ accessToken, user });
     } else {
       res.status(401).send("Invalid credentials");
     }
+  }
+
+  async refreshToken(req: Request, res: Response): Promise<void> {
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken) {
+      res.status(401).send("Refresh token not found");
+      return;
+    }
+
+    const result = await authService.refreshAccessToken(refreshToken);
+    if (result) {
+      res.json(result);
+    } else {
+      res.status(401).send("Invalid refresh token");
+    }
+  }
+
+  async logout(req: Request, res: Response): Promise<void> {
+    res.clearCookie('refreshToken');
+    res.status(200).send("Logged out");
   }
 
   async resetPassword(req: Request, res: Response): Promise<void> {

@@ -6,6 +6,7 @@ import { User, UserStatus } from "../entities/User";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
+import crypto from "crypto";
 
 export class AuthService {
   async register(name: string, email: string, password: string, birthdate?: Date, role?: string): Promise<User> {
@@ -42,7 +43,7 @@ export class AuthService {
     return userRepository.save(newUser);
   }
 
-  async login(email: string, password: string): Promise<{ token: string,user:User } | null> {
+  async login(email: string, password: string): Promise<{ accessToken: string, refreshToken: string, user: User } | null> {
     const user = await userRepository.findOne({ where: { email } });
     if (!user) {
       return null;
@@ -53,11 +54,31 @@ export class AuthService {
       return null;
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email }, "your_jwt_secret", { 
-      expiresIn: "1h",
+    const accessToken = jwt.sign({ id: user.id, email: user.email }, "your_jwt_secret", {
+      expiresIn: "1m", // Short-lived access token
     });
 
-    return { token ,user};
+    const refreshToken = crypto.randomBytes(40).toString('hex');
+    user.refreshToken = refreshToken;
+    user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    await userRepository.save(user);
+
+    return { accessToken, refreshToken, user };
+  }
+
+  async refreshAccessToken(refreshToken: string): Promise<{ accessToken: string } | null> {
+    const user = await userRepository.findOne({ where: { refreshToken } });
+
+    if (!user || !user.refreshTokenExpires || user.refreshTokenExpires < new Date()) {
+      return null;
+    }
+
+    const accessToken = jwt.sign({ id: user.id, email: user.email }, "your_jwt_secret", {
+      expiresIn: "15m",
+    });
+
+    return { accessToken };
   }
 
   async sendPasswordResetEmail(email: string): Promise<void> {

@@ -164,4 +164,7 @@ router.put("/auth/profile", authMiddleware, authController.updateProfile);
  */
 router.get("/auth/me", authMiddleware, authController.getMe);
 
+router.post("/auth/refresh-token", authController.refreshToken);
+router.post("/auth/logout", authController.logout);
+
 export default router;

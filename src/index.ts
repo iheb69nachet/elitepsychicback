@@ -2,6 +2,7 @@
 require('dotenv').config();
 import express from 'express';
 import bodyParser from 'body-parser';
+import cookieParser from 'cookie-parser';
 import { AppDataSource } from './data-source';
 import userRoutes from './routes/userRoutes';
 import blogRoutes from './routes/blogRoutes';
@@ -16,6 +17,7 @@ import { UserService } from './services/UserService';
 const cors=require('cors');
 const app = express();
 app.use(cors());
+app.use(cookieParser());
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -69,7 +71,7 @@ app.use('/api', packageRoutes);
 app.use('/api', stripeRoutes);
 app.use('/api', psychicSettingRoutes);
 app.use('/api', blogRoutes);
-app.use('/api', createRoomRoutes());
+app.use('/api', createRoomRoutes(io));
 
 
 

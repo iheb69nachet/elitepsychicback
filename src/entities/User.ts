@@ -51,4 +51,10 @@ export class User {
 
   @OneToOne(() => PsychicSetting, psychicSetting => psychicSetting.user)
   psychicSetting?: PsychicSetting;
+
+  @Column({ nullable: true })
+  refreshToken?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  refreshTokenExpires?: Date;
 }

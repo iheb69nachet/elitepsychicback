@@ -7,8 +7,12 @@ const blogService = new BlogService();
 export class BlogController {
   async getAllBlogs(req: Request, res: Response): Promise<void> {
     const onlyPublished = req.query.published === 'true';
-    const blogs = await blogService.getAllBlogs(onlyPublished);
-    res.json(blogs);
+    const blogs = await blogService.getAllBlogs(onlyPublished, 2);
+    const blogsWithImageUrls = blogs.map(blog => ({
+      ...blog,
+      image: blog.image ? `http://localhost:9000/${blog.image}` : null
+    }));
+    res.json(blogsWithImageUrls);
   }
 
   async getBlogById(req: Request, res: Response): Promise<void> {

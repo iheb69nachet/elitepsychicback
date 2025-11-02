@@ -6,10 +6,12 @@ import { roomRepository } from "../repositories/RoomRepository";
 import { userRepository } from "../repositories/UserRepository";
 import { authMiddleware } from "../middleware/authMiddleware";
 
-export default function createRoomRoutes(): Router {
+import { Server } from "socket.io";
+
+export default function createRoomRoutes(io: Server): Router {
   const router = Router();
   const roomService = new RoomService(roomRepository, userRepository);
-  const roomController = new RoomController(roomService);
+  const roomController = new RoomController(roomService, io);
 
   /**
    * @swagger

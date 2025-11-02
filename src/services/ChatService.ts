@@ -52,13 +52,11 @@ export class ChatService {
 
       socket.on("getMessages", async ({ roomId }) => {
         const messages = await this.getMessages(roomId);
-        console.log(messages);
         
         socket.emit("roomMessages", messages);
       });
 
       socket.on("acceptChat", async ({ requestId }) => {
-        console.log({requestId});
         
         const psychicId = (socket as any).userId;
         const chatRequest = await this.chatRequestRepository.findOne({
@@ -102,10 +100,9 @@ export class ChatService {
         const { senderId, roomId, content } = data;
         const message = await this.createMessage(senderId, roomId, content);
         const messages=await this.getMessages(roomId);
-        console.log(messages);
         
         this.io.emit("receiveMessage", message);
-        // this.io.emit("roomMessages", messages);
+        this.io.emit("roomMessages", messages);
 
       });
 
@@ -142,7 +139,6 @@ export class ChatService {
   }
 
   async getMessages(roomId: number): Promise<Message[]> {
-    console.log({roomId});
     
     return this.messageRepository.find({
       where: { room: { id: roomId } },

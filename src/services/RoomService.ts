@@ -5,13 +5,15 @@ import { User } from "../entities/User";
 import { roomRepository } from "../repositories/RoomRepository";
 import { userRepository } from "../repositories/UserRepository";
 
+import { Server } from "socket.io";
+
 export class RoomService {
   constructor(
     private roomRepository: Repository<Room>,
     private userRepository: Repository<User>
   ) {}
 
-async createRoom(clientId: number, psychicId: number): Promise<Room> {
+async createRoom(clientId: number, psychicId: number, io: Server): Promise<Room> {
   const client = await this.userRepository.findOne({
     where: { id: clientId },
     relations: ["role"],
@@ -35,6 +37,7 @@ async createRoom(clientId: number, psychicId: number): Promise<Room> {
   });
 
   if (existingRoom) {
+      io.emit("roomid", existingRoom);
     return existingRoom;
   }
 
@@ -44,7 +47,12 @@ async createRoom(clientId: number, psychicId: number): Promise<Room> {
     psychic: psychic,
   });
 
-  return this.roomRepository.save(room);
+  const savedRoom = await this.roomRepository.save(room);
+  console.log(io);
+      io.emit("roomid", savedRoom);
+  
+
+  return savedRoom;
 }
 
   async getRoomById(roomId: number): Promise<Room | null> {

@@ -2,11 +2,12 @@ import { blogRepository } from "../repositories/BlogRepository";
 import { Blog, BlogStatus } from "../entities/Blog";
 
 export class BlogService {
-  async getAllBlogs(onlyPublished: boolean = false): Promise<Blog[]> {
-    if (onlyPublished) {
-      return blogRepository.find({ where: { status: BlogStatus.PUBLISHED } });
+  async getAllBlogs(onlyPublished: boolean = false, limit?: number): Promise<Blog[]> {
+    const options = onlyPublished ? { where: { status: BlogStatus.PUBLISHED } } : {};
+    if (limit) {
+      return blogRepository.find({ ...options, take: limit });
     }
-    return blogRepository.find();
+    return blogRepository.find(options);
   }
 
   async getBlogById(id: number): Promise<Blog | null> {
