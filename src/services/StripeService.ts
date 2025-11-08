@@ -23,7 +23,7 @@ export class StripeService {
     const user = transaction.user;
     const pkg = transaction.package;
 
-    user.balance = Number(user.balance) + Number(pkg.balance);
+    user.balance = String(Number(user.balance) + Number(pkg.balance));
     await userRepository.save(user);
   }
 

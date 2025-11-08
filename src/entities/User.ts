@@ -34,8 +34,8 @@ export class User {
   })
   status!: UserStatus;
 
-  @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
-  balance!: number;
+  @Column({ default: 0 })
+  balance!: string;
 
   @Column({ nullable: true })
   avatar?: string;

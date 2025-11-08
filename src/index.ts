@@ -45,6 +45,10 @@ AppDataSource.initialize()
     const chatService = new ChatService(messageRepository, userRepository, userService, chatRequestRepository,roomRepository); // Pass the instance
     chatService.init(io);
 
+    const balanceUpdateWorker = new BalanceUpdateWorker(io);
+    console.log("BalanceUpdateWorker instantiated.");
+    balanceUpdateWorker.start();
+
     app.use('/api', createChatRoutes(chatService));
 
     
@@ -63,6 +67,7 @@ import stripeRoutes from './routes/stripeRoutes';
 import psychicSettingRoutes from './routes/psychicSettingRoutes';
 import { ChatRequestRepository } from './repositories/ChatRequestRepository';
 import { roomRepository } from './repositories/RoomRepository';
+import { BalanceUpdateWorker } from './workers/BalanceUpdateWorker';
 
 
 app.use('/api', authRoutes);

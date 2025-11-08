@@ -6,6 +6,23 @@ import { Role } from "../entities/Role";
 import bcrypt from 'bcryptjs';
 
 export class UserService {
+  async getPsychicSetting(psychicId: any) {
+    const user = await userRepository.findOne({
+      where: { id: psychicId },
+      relations: ["psychicSetting"],
+    });
+    if (!user || !user.psychicSetting) {
+      throw new Error("Psychic setting not found");
+    }
+    return user.psychicSetting;
+  }
+  async getUserBalance(userId: any): Promise<number> {
+    const user = await userRepository.findOneBy({ id: userId });
+    if (!user) {
+      throw new Error("User not found");
+    }
+    return parseFloat(user.balance);
+  }
   async getAllUsers(): Promise<User[]> {
     // return userRepository.find({
     //   relations: ["role"],
@@ -65,7 +82,7 @@ export class UserService {
       }
       user.role = role;
     }
-    if (balance) user.balance = balance;
+    if (balance !== undefined) user.balance = balance.toString();
 
     return userRepository.save(user);
   }
