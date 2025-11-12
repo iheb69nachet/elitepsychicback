@@ -43,6 +43,9 @@ export class User {
   @Column({ default: false })
   isOnline!: boolean;
 
+  @Column({ nullable: true }) // New socketId column
+  socketId?: string;
+
   @ManyToOne(() => Role)
   role!: Role;
 

@@ -9,6 +9,10 @@ import { PsychicSetting } from "./entities/PsychicSetting";
 import { Blog } from "./entities/Blog";
 import { RemedyAndSpell } from "./entities/RemedyAndSpell";
 
+import { Message } from "./entities/Message";
+import { ChatRequest } from "./entities/ChatRequest";
+import { Room } from "./entities/Room";
+
 export const AppDataSource = new DataSource({
     type: "mysql",
     host: "localhost",
@@ -18,7 +22,7 @@ export const AppDataSource = new DataSource({
     database: "aura",
     synchronize: false,
     logging: false,
-    entities: [User, Role, Package, Transaction, PsychicSetting, Blog, RemedyAndSpell],
+    entities: [User, Role, Package, Transaction, Message, PsychicSetting, Blog, ChatRequest, Room, RemedyAndSpell],
     migrations: ["src/migrations/*.ts"],
     subscribers: [],
 });
