@@ -2,6 +2,7 @@ import redisClient from '../redis';
 import { roomRepository } from '../repositories/RoomRepository';
 import { userRepository } from '../repositories/UserRepository';
 import { Server } from 'socket.io';
+import { ChatStatus } from '../entities/Room';
 
 export class BalanceUpdateWorker {
   private io: Server;
@@ -36,6 +37,11 @@ export class BalanceUpdateWorker {
 
     if (!room || !room.client || !room.psychic || !room.psychic.psychicSetting) {
       console.error(`Room, client, psychic, or psychic setting not found for roomId: ${roomId}`);
+      return;
+    }
+
+    if (room.status === "ended") {
+      console.log(`Room ${roomId} is already ended. Skipping balance update.`);
       return;
     }
 

@@ -19,10 +19,10 @@ export const AppDataSource = new DataSource({
     username: "root",
     password: "yourpassword",
     database: "aura",
-    synchronize: true,
+    synchronize: false,
     logging: false,
     entities: [User, Role, Package, Transaction, Message, PsychicSetting, Blog, ChatRequest, Room, RemedyAndSpell],
-    migrations: [],
+    migrations: ["src/migrations/*.ts"],
     subscribers: [],
 });
 

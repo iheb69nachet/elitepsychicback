@@ -5,8 +5,14 @@ import {
   ManyToOne,
   CreateDateColumn,
   UpdateDateColumn,
+  Column,
 } from "typeorm";
 import { User } from "./User";
+
+export enum ChatStatus {
+  ACTIVE = "active",
+  ENDED = "ended",
+}
 
 @Entity()
 export class Room {
@@ -18,6 +24,22 @@ export class Room {
 
   @ManyToOne(() => User)
   psychic!: User;
+
+  @Column({
+    type: "enum",
+    enum: ChatStatus,
+    default: ChatStatus.ACTIVE,
+  })
+  status!: ChatStatus;
+
+  @Column({ default: false })
+  clientJoined!: boolean;
+
+  @Column({ default: false })
+  psychicJoined!: boolean;
+
+  @Column({ default: false })
+  timerStarted!: boolean;
 
   @CreateDateColumn()
   createdAt!: Date;
