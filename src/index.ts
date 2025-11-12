@@ -6,6 +6,8 @@ import cookieParser from 'cookie-parser';
 import { AppDataSource } from './data-source';
 import userRoutes from './routes/userRoutes';
 import blogRoutes from './routes/blogRoutes';
+import http from 'http';
+import { Server } from 'socket.io';
 
 
 import { UserService } from './services/UserService';
@@ -14,6 +16,21 @@ const cors=require('cors');
 const app = express();
 app.use(cors());
 app.use(cookieParser());
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+  },
+});
+
+io.on("connection", (socket) => {
+  console.log("✅ User connected to WebSocket");
+
+  socket.on("disconnect", () => {
+    console.log("❌ User disconnected from WebSocket");
+  });
+});
 
 app.use(bodyParser.json());
 
@@ -54,6 +71,6 @@ app.use('/api', remedyAndSpellRoutes);
 
 
 const port = process.env.PORT || 9001;
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
