@@ -94,4 +94,17 @@ export class UserService {
       await userRepository.save(user);
     }
   }
+
+  async deductBalance(userId: number, amount: number): Promise<User | null> {
+    const user = await userRepository.findOneBy({ id: userId });
+    if (!user) {
+      return null;
+    }
+
+    const currentBalance = parseFloat(user.balance);
+    const newBalance = currentBalance - amount;
+    user.balance = newBalance.toString();
+
+    return userRepository.save(user);
+  }
 }

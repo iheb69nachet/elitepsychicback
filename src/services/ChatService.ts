@@ -1,4 +1,3 @@
-import redisClient from '../redis';
 import { Message } from "../entities/Message";
 import { User } from "../entities/User";
 import { Room, ChatStatus } from "../entities/Room";
@@ -26,7 +25,7 @@ interface SocketWithUser extends Socket {
 export class ChatService {
   private io!: Server;
   private activeChats = new Map<number, ActiveChat>();
-  private readonly TIMER_INTERVAL_MS = 60000; // 1 minute
+  private readonly TIMER_INTERVAL_MS = 10000; // 10 seconds
   private readonly SECONDS_PER_MINUTE = 60;
 
   constructor(
@@ -41,7 +40,7 @@ export class ChatService {
   init(io: Server): void {
     this.io = io;
     this.registerSocketHandlers();
-    // this.startGlobalTimer(); // Timer will be started when both join
+    this.startGlobalTimer(); // Timer will be started when both join
   }
 
   // ============================================================================
@@ -51,12 +50,11 @@ export class ChatService {
   private registerSocketHandlers(): void {
     this.io.on("connection", (socket: SocketWithUser) => {
       console.log("✅ User connected");
-
       socket.on("join", (data) => this.handleJoin(socket, data));
       socket.on("joinRoom", (data) => this.handleJoinRoom(socket, data));
       socket.on("getMessages", (data) => this.handleGetMessages(socket, data));
       socket.on("acceptChat", (data) => this.handleAcceptChat(socket, data));
-      socket.on("rejectChat", (data) => this.handleRejectChat(data)); // Changed to accept data directly
+      socket.on("rejectChat", (data) => this.handleRejectChat(data)); 
       socket.on("sendMessage", (data) => this.handleSendMessage(data));
       socket.on("psychicLeaveChat", (data) => this.handlePsychicLeaveChat(data));
       socket.on("join-chat", (data) => this.handleJoinChat(socket, data));
@@ -74,10 +72,27 @@ export class ChatService {
     socket.join(roomId.toString());
     const messages = await this.getMessages(roomId);
     this.io.emit("roomMessages", messages);
+
+    // Find the active chat session for this room and send the current timer value
+    for (const [userId, chat] of this.activeChats.entries()) {
+      if (chat.roomIds.includes(roomId)) {
+        socket.emit("timer", {
+          userId,
+          roomId,
+          timeLeft: chat.timeLeftSeconds,
+        });
+        break;
+      }
+    }
   }
 
   private async handleGetMessages(socket: Socket, { roomId }: { roomId: number }): Promise<void> {
+    console.log('client request get messages');
+    
     const messages = await this.getMessages(roomId);
+    console.log(socket.id);
+
+    
     socket.emit("roomMessages", messages);
   }
 
@@ -143,10 +158,41 @@ console.log('chat accepted');
   }): Promise<void> {
     const { senderId, roomId, content } = data;
     const message = await this.createMessage(senderId, roomId, content);
-    const messages = await this.getMessages(roomId);
 
-    this.io.emit("receiveMessage", message);
-    this.io.emit("roomMessages", messages);
+    const room = await this.roomRepository.findOne({
+      where: { id: roomId },
+      relations: ["client", "psychic"],
+    });
+
+    if (!room) {
+      console.error(`Room ${roomId} not found for sending message.`);
+      return;
+    }
+
+    let receiverId: number;
+    if (room.client.id === senderId) {
+      receiverId = room.psychic.id;
+    } else if (room.psychic.id === senderId) {
+      receiverId = room.client.id;
+    } else {
+      console.error(`Sender ${senderId} is not part of room ${roomId}.`);
+      return;
+    }
+
+    const receiver = await this.userRepository.findOneBy({ id: receiverId });
+
+    if (receiver && receiver.socketId) {
+      this.io.to(receiver.socketId).emit("receiveMessage", message);
+      // Also emit to the sender's socket so they see their own message
+      const sender = await this.userRepository.findOneBy({ id: senderId });
+      if (sender && sender.socketId) {
+        this.io.to(sender.socketId).emit("receiveMessage", message);
+      }
+    } else {
+      console.warn(`Receiver ${receiverId} not found or does not have an active socketId.`);
+      // Fallback: emit to the room if receiver is not directly reachable
+      this.io.to(roomId.toString()).emit("receiveMessage", message);
+    }
   }
 
   private async handlePsychicLeaveChat({ roomId }: { roomId: number }): Promise<void> {
@@ -164,6 +210,7 @@ console.log('chat accepted');
 
     await this.endRoom(room);
     this.removeRoomFromActiveChat(room.client.id, roomId);
+console.log('ending chat');
 
     this.io.emit("chat-ended", {
       roomId,
@@ -208,6 +255,11 @@ console.log('chat accepted');
 
     if (existingChat) {
       this.addRoomToExistingSession(existingChat, roomId);
+      socket.emit("timer", {
+        userId: room.client.id,
+        roomId,
+        timeLeft: existingChat.timeLeftSeconds,
+      });
     }
 
     // socket.join(userId.toString());
@@ -224,46 +276,69 @@ console.log('chat accepted');
 
     await this.userService.setUserOnlineStatus(userId, false);
 
-    // If disconnecting user is a psychic, end all their active rooms
     if (userRole === 'psychic') {
       await this.handlePsychicDisconnect(userId);
-    }
-
-    // Handle client chat cleanup
-    const chat = this.activeChats.get(userId);
-    if (chat) {
-      chat.activeSessions -= 1;
-      if (chat.activeSessions <= 0) {
-        this.activeChats.delete(userId);
-        console.log(`🧹 Cleaned up chat session for user ${userId}`);
-      }
+    } else if (userRole === 'client') {
+      await this.handleClientDisconnect(userId);
     }
   }
 
   // ============================================================================
-  // Psychic Disconnect Handler
+  // Disconnect Handlers
   // ============================================================================
 
+  private async handleClientDisconnect(clientId: number): Promise<void> {
+    console.log(`🔴 Client ${clientId} disconnected`);
+
+    const chat = this.activeChats.get(clientId);
+    if (!chat) {
+      console.log(`No active chat found for client ${clientId}`);
+      return;
+    }
+
+    for (const roomId of chat.roomIds) {
+      const room = await this.roomRepository.findOne({ where: { id: roomId }, relations: ["psychic"] });
+      if (room) {
+        if (room.status === ChatStatus.ACTIVE) {
+          await this.endRoom(room);
+        }
+
+        // Emit chat-ended to the room
+        this.io.to(room.id.toString()).emit("chat-ended", {
+          roomId: room.id,
+          reason: "client_disconnected",
+          message: "Client has disconnected from the chat.",
+        });
+
+        console.log(`✅ Ended room ${room.id} for client ${clientId}`);
+      }
+    }
+
+    this.activeChats.delete(clientId);
+    console.log(`🧹 Cleaned up chat session for client ${clientId}`);
+  }
+  
   private async handlePsychicDisconnect(psychicId: number): Promise<void> {
     console.log(`🔴 Psychic ${psychicId} disconnected`);
 
     // Find all active rooms where this psychic is participating
-    const activeRooms = await this.roomRepository.find({
+    const rooms = await this.roomRepository.find({
       where: { 
         psychic: { id: psychicId },
-        status: ChatStatus.ACTIVE 
       },
       relations: ["client", "psychic"],
     });
 
-    if (activeRooms.length === 0) {
+    if (rooms.length === 0) {
       console.log(`No active rooms found for psychic ${psychicId}`);
       return;
     }
 
     // End all active rooms for this psychic
-    for (const room of activeRooms) {
-      await this.endRoom(room);
+    for (const room of rooms) {
+      if (room.status === ChatStatus.ACTIVE) {
+        await this.endRoom(room);
+      }
       this.removeRoomFromActiveChat(room.client.id, room.id);
 
       // Emit chat-ended to the room
@@ -276,7 +351,7 @@ console.log('chat accepted');
       console.log(`✅ Ended room ${room.id} for psychic ${psychicId}`);
     }
 
-    console.log(`🧹 Cleaned up ${activeRooms.length} room(s) for psychic ${psychicId}`);
+    console.log(`🧹 Cleaned up ${rooms.length} room(s) for psychic ${psychicId}`);
   }
 
   // ============================================================================
@@ -355,12 +430,23 @@ console.log('chat accepted');
 
   private async processActiveChats(): Promise<void> {
     for (const [userId, chat] of this.activeChats.entries()) {
-      chat.timeLeftSeconds -= 1;
+      chat.timeLeftSeconds -= 10;
+      console.log(`Room with user ${userId} has ${chat.timeLeftSeconds} seconds remaining.`);
+
+      for (const roomId of chat.roomIds) {
+        if (roomId) {
+          this.io.to(roomId.toString()).emit("timer", {
+            userId,
+            roomId,
+            timeLeft: chat.timeLeftSeconds,
+          });
+        }
+      }
 
       if (chat.timeLeftSeconds <= 0) {
         await this.endChatSession(userId, chat, "insufficient_balance");
       } else {
-        await this.queueBalanceUpdates(chat.roomIds);
+        await this.updateBalances(chat.roomIds, 10);
       }
     }
   }
@@ -371,26 +457,46 @@ console.log('chat accepted');
     reason: string
   ): Promise<void> {
     for (const roomId of chat.roomIds) {
-      this.io.to(roomId.toString()).emit("chat-ended", {
-        roomId,
-        reason,
-        message: "Chat ended due to insufficient balance",
-      });
+      if (roomId) {
+        const room = await this.roomRepository.findOne({ where: { id: roomId } });
+        if (room) {
+          await this.endRoom(room);
+        }
 
-      await this.queueBalanceUpdate(roomId);
+        this.io.to(roomId.toString()).emit("chat-ended", {
+          roomId,
+          reason,
+          message: "Chat ended due to insufficient balance",
+        });
+
+        await this.updateBalance(roomId, 10);
+      }
     }
 
     this.activeChats.delete(userId);
     console.log(`🚨 Chat session ended for user ${userId}`);
   }
 
-  private async queueBalanceUpdates(roomIds: number[]): Promise<void> {
-    const promises = roomIds.map((roomId) => this.queueBalanceUpdate(roomId));
+  private async updateBalances(roomIds: number[], seconds: number): Promise<void> {
+    const promises = roomIds.map((roomId) => this.updateBalance(roomId, seconds));
     await Promise.all(promises);
   }
 
-  private async queueBalanceUpdate(roomId: number): Promise<void> {
-    await redisClient.lpush("balance_update_queue", roomId.toString());
+  private async updateBalance(roomId: number, seconds: number): Promise<void> {
+    const room = await this.roomRepository.findOne({ where: { id: roomId }, relations: ["client", "psychic", "psychic.psychicSetting"] });
+    if (!room) {
+      return;
+    }
+
+    if (!room.psychic.psychicSetting) {
+      console.error(`Psychic ${room.psychic.id} has no psychicSetting for room ${roomId}.`);
+      return;
+    }
+
+    const ratePerSecond = room.psychic.psychicSetting.minuteRate / 60;
+    const cost = seconds * ratePerSecond;
+
+    await this.userService.deductBalance(room.client.id, cost);
   }
 
   // ============================================================================
@@ -457,6 +563,8 @@ console.log('chat accepted');
   }
 
   async getMessages(roomId: number): Promise<Message[]> {
+    console.log('called get messagess');
+    
     return this.messageRepository.find({
       where: { room: { id: roomId } },
       order: { createdAt: "ASC" },
